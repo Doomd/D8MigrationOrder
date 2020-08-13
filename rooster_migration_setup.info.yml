@@ -1,0 +1,12 @@
+type: module
+name: Rooster Migration Setup
+description: 'Rooster Migration'
+package: Rooster Migration
+core: 8.x
+dependencies:
+  - drupal:migrate
+  - migrate_google_sheets:migrate_google_sheets
+  - migrate_plus
+  - migrate_tools
+  - address
+  - office_hours

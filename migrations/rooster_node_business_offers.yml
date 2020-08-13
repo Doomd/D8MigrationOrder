@@ -1,0 +1,253 @@
+id: rooster_node_business_offers
+label: "Rooster Migrate Business Offer Content"
+migration_group: Rooster
+migration_tags:
+  - Rooster 060
+  - Rooster Business
+  - Rooster G1
+
+source:
+  constants:
+    URL_TICKET_TITLE: "Ticketing URL"
+    URL_EVENT_TITLE: "Event URL"
+
+  plugin: url
+  data_fetcher_plugin: http
+  data_parser_plugin: google_sheets
+  # MigrateMasterBook Sheet: REDACTED
+  urls: "REDACTED"
+
+  fields:
+    - name: src_unique_id
+      label: "Unique ID"
+      selector: moid
+
+    - name: src_offer_id
+      label: "Offer ID"
+      selector: moid
+
+    - name: src_place_id
+      label: "Place ID"
+      selector: placeid
+
+    - name: src_parent_id
+      label: "Parent Biz ID"
+      selector: parentbizid
+
+    - name: src_biz_type
+      label: "Business Types"
+      selector: biztype
+
+    - name: src_biz_name
+      label: "Business Name"
+      selector: businessname
+
+    - name: src_offer_type
+      label: "Offer Type"
+      selector: offertype
+
+    - name: src_title
+      label: "Title"
+      selector: title
+
+    - name: src_offer_details
+      label: "Offer Details"
+      selector: offerdetails
+
+    - name: src_url1
+      label: "URL1"
+      selector: url1
+
+    - name: src_url2
+      label: "URL2"
+      selector: url2
+
+    - name: src_links_array
+      label: "LinksArray"
+      selector: linksarray
+
+    - name: src_links_delimited
+      label: "LinksDelimited"
+      selector: linksdelimited
+
+    - name: src_start_datetime
+      label: "Start Date Time"
+      selector: startdatetimeutc
+
+    - name: src_end_datetime
+      label: "End Datetime"
+      selector: enddatetimeutc
+
+    - name: src_rrule
+      label: "RRule"
+      selector: rrule
+
+    - name: src_offer_tags
+      label: "Offer Tags"
+      selector: offertags
+
+    - name: src_age_limit
+      label: "Age Limit"
+      selector: agelimit
+
+  ids:
+    src_unique_id:
+      type: string
+
+process:
+  # This process attempts to use title for title, and if it's empty, uses offer type for the title instead.
+  title:
+    - plugin: get
+      source:
+        - src_title
+        - src_offer_type
+    # This plugin filters out empty sources
+    - plugin: callback
+      callable: array_filter
+    # Use the first none empty source
+    - plugin: callback
+      callable: "current"
+
+  uid:
+    - plugin: migration_lookup
+      migration: rooster_users
+      source: src_parent_id
+    - plugin: default_value
+      default_value: 1
+
+  field_business_parent:
+    plugin: migration_lookup
+    migration: rooster_node_parent_business
+    source: src_parent_id
+
+  field_business_location:
+    plugin: migration_lookup
+    migration: rooster_node_business_location
+    source: src_place_id
+
+  field_business_offer_type:
+    - plugin: skip_on_empty
+      source: src_offer_type
+      method: process
+      message: "No src_offer_type listed."
+    - plugin: explode
+      delimiter: ";"
+    - plugin: callback
+      callable: trim
+    - plugin: callback
+      callable: ucfirst
+    - plugin: entity_generate
+      entity_type: taxonomy_term
+      value_key: name
+      bundle_key: vid
+      bundle: business_offer_types
+
+  field_business_offer_tags:
+    - plugin: skip_on_empty
+      source: src_offer_tags
+      method: process
+      message: "No src_offer_tags listed."
+    - plugin: explode
+      delimiter: "|"
+    - plugin: callback
+      callable: trim
+    - plugin: callback
+      callable: ucfirst
+    - plugin: entity_generate
+      entity_type: taxonomy_term
+      value_key: name
+      bundle_key: vid
+      bundle: business_offer_tags
+
+  field_business_dates/value:
+    - plugin: skip_on_empty
+      method: process
+      source: src_start_datetime
+      message: "field_dates/value (start datetime) is empty"
+    - plugin: format_date
+      from_format: "Y-m-d H:i:s"
+      to_format: 'Y-m-d\TH:i:s'
+  field_business_dates/end_value:
+    - plugin: skip_on_empty
+      method: process
+      source: src_end_datetime
+      message: "field_dates/end_value (end datetime) is empty"
+    - plugin: format_date
+      from_format: "Y-m-d H:i:s"
+      to_format: 'Y-m-d\TH:i:s'
+  field_business_dates/timezone:
+    - plugin: default_value
+      default_value: "America/Denver"
+  field_business_dates/rrule:
+    - plugin: skip_on_empty
+      method: process
+      source: src_rrule
+      message: "field_dates/rrule (rrule) is empty"
+    - plugin: get
+
+  urls_temp:
+    - plugin: skip_on_empty
+      source: src_links_delimited
+      method: process
+      message: "No links. Skipping."
+    - plugin: explode
+      delimiter: ";"
+    - plugin: explode
+      delimiter: "|"
+    - plugin: default_value
+      default_value: ""
+  field_business_links:
+    - plugin: skip_on_empty
+      method: process
+      source: "@urls_temp"
+      message: "field_links is empty. Skipping."
+    - plugin: sub_process
+      process:
+        title: "0"
+        uri: "1"
+
+  field_offer_details/value:
+    - plugin: skip_on_empty
+      method: process
+      source: src_offer_details
+      message: "Offer Details is empty. Skipping."
+  field_offer_details/format:
+    plugin: default_value
+    default_value: basic_html
+
+  field_age/value:
+    - plugin: skip_on_empty
+      method: process
+      source: src_age_limit
+      message: "No Age Limit. Skipping."
+
+  # Test String
+  field_business_parent_id:
+    plugin: skip_on_empty
+    source: src_parent_id
+    method: process
+    message: "No Parent ID. Skipping."
+
+  # Text String
+  field_business_place_id:
+    plugin: skip_on_empty
+    source: src_place_id
+    method: process
+    message: "No Place ID. Skipping."
+
+  #Text String
+  field_business_offer_id:
+    plugin: skip_on_empty
+    source: src_offer_id
+    method: process
+    message: "No Offer ID. Skipping."
+
+destination:
+  plugin: "entity:node"
+  default_bundle: business_offer
+migration_dependencies:
+  required:
+    - rooster_users
+    - rooster_node_parent_business
+    - rooster_node_business_location
+  optional: []

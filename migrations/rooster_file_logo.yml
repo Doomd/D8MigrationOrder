@@ -1,0 +1,69 @@
+id: rooster_file_logo
+label: "Rooster Migrate Logo File Entities"
+migration_group: Rooster
+migration_tags:
+  - Rooster 010
+  - Rooster Business
+  - Rooster G1
+source:
+  constants:
+    DRUPAL_FILE_DIRECTORY: "public://images/business/logos/"
+    # DRUPAL_FILE_DIRECTORY: "public://images/business/logos/"
+    IMAGE_SOURCE_DOMAIN: "REDACTED"
+
+  plugin: url
+  data_fetcher_plugin: http
+  data_parser_plugin: google_sheets
+  # MigrateMasterBook Sheet: REDACTED
+  urls: "REDACTED"
+  fields:
+    - name: src_image_id
+      label: "Place ID"
+      selector: placeid
+
+    - name: src_url_logo
+      label: "Logo"
+      selector: logo
+
+  ids:
+    src_image_id:
+      type: string
+
+process:
+  psuedo_destination_filename:
+    - plugin: callback
+      callable: basename
+      source: src_url_logo
+    - plugin: clean_filename
+    - plugin: skip_on_empty
+      method: row
+      message: "empty image filename."
+
+  psuedo_destination_full_path:
+    - plugin: concat
+      source:
+        - constants/DRUPAL_FILE_DIRECTORY
+        - "@psuedo_destination_filename"
+    - plugin: urlencode
+  psuedo_source_image_path:
+    - plugin: concat
+      # deliminator: "/"
+      source:
+        - constants/IMAGE_SOURCE_DOMAIN # Base Path where the Image is hosted
+        - src_url_logo # This is the relative path (from the photo URL column)
+    - plugin: urlencode
+  uri:
+    - plugin: skip_on_empty
+      method: process
+      source: "@psuedo_source_image_path"
+    - plugin: file_copy
+      source:
+        - "@psuedo_source_image_path"
+        - "@psuedo_destination_full_path"
+      file_exists: "use existing"
+      move: FALSE
+destination:
+  plugin: "entity:file"
+migration_dependencies:
+  required: []
+  optional: []

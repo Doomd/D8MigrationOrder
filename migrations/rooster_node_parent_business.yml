@@ -1,0 +1,84 @@
+id: rooster_node_parent_business
+label: "Rooster Migrate Parent Business Content"
+migration_group: Rooster
+migration_tags:
+  - Rooster 040
+  - Rooster Business
+  - Rooster G1
+
+source:
+  plugin: url
+  data_fetcher_plugin: http
+  data_parser_plugin: google_sheets
+  # MigrateMasterBook Sheet: REDACTED
+  urls: "REDACTED"
+  
+  fields:
+    - name: src_unique_id
+      label: "User Id"
+      selector: parentbizid
+
+    - name: src_pb_name
+      label: "Parent Business Name"
+      selector: parentbusinessname
+
+    - name: src_child_business_locations
+      label: "Child Place IDs"
+      selector: childplaceids
+
+    - name: src_account_managers
+      label: "Account Manager"
+      selector: accountmanager
+
+  ids:
+    src_unique_id:
+      type: string
+
+process:
+  title: src_pb_name
+  uid:
+    - plugin: migration_lookup
+      migration: rooster_users
+      source: src_unique_id
+    - plugin: default_value
+      default_value: 1
+
+  field_business_location:
+    - plugin: explode
+      source: src_child_business_locations
+      delimiter: ;
+    - plugin: callback
+      callable: trim
+    - plugin: migration_lookup
+      migration: rooster_node_business_location
+
+  # If there's an account manager, assign the user # to this field.
+  field_business_account_managers:
+    - plugin: skip_on_empty
+      method: process
+      source: src_account_managers
+    - plugin: explode
+      delimiter: ";"
+    - plugin: callback
+      callable: trim
+    - plugin: static_map
+      map:
+        "Maddie": 2361
+        "Chrissy": 2362
+        "Alex": 2361
+      default_value: null
+
+  # Text String
+  field_business_parent_id:
+    plugin: skip_on_empty
+    source: src_unique_id
+    method: process
+    message: "No Parent ID. Skipping."
+
+destination:
+  plugin: "entity:node"
+  default_bundle: business_parent
+migration_dependencies:
+  required:
+    - rooster_users
+  optional: []

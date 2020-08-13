@@ -1,0 +1,325 @@
+id: rooster_node_business_location
+label: "Rooster Migrate Business Location Content"
+migration_group: Rooster
+migration_tags:
+  - Rooster 050
+  - Rooster Business
+  - Rooster G1
+
+source:
+  constants:
+    PHOTO_DESCRIPTION_PREFIX: "Photo of "
+
+  plugin: url
+  data_fetcher_plugin: http
+  data_parser_plugin: google_sheets
+  # MigrateMasterBook Sheet: REDACTED
+  urls: "REDACTED"
+  fields:
+    - name: src_unique_id
+      label: "Unique ID"
+      selector: placeid
+
+    - name: src_name
+      label: "Biz Location"
+      selector: bizlocation
+
+    - name: source_parent_id
+      label: "Parent Biz ID"
+      selector: parentbizid
+
+    - name: src_photo_id
+      label: "Photo ID"
+      selector: placeid
+
+    - name: src_bus_type
+      label: "Business Type"
+      selector: businesstype
+
+    - name: src_address1
+      label: "Address1"
+      selector: add1
+    - name: src_address2
+      label: "Address2"
+      selector: add2
+    - name: src_city
+      label: "City"
+      selector: city
+    - name: src_state
+      label: "State"
+      selector: state
+    - name: src_postal_code
+      label: "Postal Code"
+      selector: zip
+
+    - name: src_lat
+      label: "Latitude"
+      selector: pdlatitude
+    - name: src_lon
+      label: "Longitude"
+      selector: pdlongitude
+
+    - name: src_business_description
+      label: "About"
+      selector: about
+
+    - name: src_sun1
+      label: "Sunday 1"
+      selector: sun1
+    - name: src_sun2
+      label: "Sunday 2"
+      selector: sun2
+    - name: src_mon1
+      label: "Monday 1"
+      selector: mon1
+    - name: src_mon2
+      label: "Monday 2"
+      selector: mon2
+    - name: src_tue1
+      label: "Tuesday 1"
+      selector: tue1
+    - name: src_tue2
+      label: "Tuesday 2"
+      selector: tue2
+    - name: src_wed1
+      label: "Wednesday 1"
+      selector: wed1
+    - name: src_wed2
+      label: "Wednesday 2"
+      selector: wed2
+    - name: src_thu1
+      label: "Thursday 1"
+      selector: thu1
+    - name: src_thu2
+      label: "Thursday 2"
+      selector: thu2
+    - name: src_fri1
+      label: "Friday 1"
+      selector: fri1
+    - name: src_fri2
+      label: "Friday 2"
+      selector: fri2
+    - name: src_sat1
+      label: "Saturday 1"
+      selector: sat1
+    - name: src_sat2
+      label: "Saturday 2"
+      selector: sat2
+
+    - name: src_business_offers
+      label: "Location Offers"
+      selector: locationoffers
+
+    - name: src_links
+      label: "Links"
+      selector: links
+
+    - name: src_business_phone
+      label: "Phone"
+      selector: phone
+
+    - name: src_temp_closed
+      label: "Temporarily Closed"
+      selector: temporarilyclosed
+
+  ids:
+    src_unique_id:
+      type: string
+
+process:
+  title:
+    - plugin: get
+      source: src_name
+    - plugin: default_value
+      default_value: "NO BUSINESS LOCATION NAME"
+  uid:
+    - plugin: migration_lookup
+      migration: rooster_users
+      source: source_parent_id
+    - plugin: default_value
+      default_value: 1
+
+  #Single Photo Works...
+  field_business_bg/target_id:
+    plugin: migration_lookup
+    migration: rooster_file_bg_photo_to_media
+    source: src_photo_id
+
+  field_business_logo/target_id:
+    plugin: migration_lookup
+    migration: rooster_file_logo_to_media
+    source: src_photo_id
+
+  field_business_parent:
+    plugin: migration_lookup
+    migration: rooster_node_parent_business
+    source: source_parent_id
+
+  field_business_types:
+    - plugin: skip_on_empty
+      source: src_bus_type
+      method: process
+      message: "No src_bus_type listed."
+    - plugin: explode
+      delimiter: ";"
+    - plugin: callback
+      callable: trim
+    - plugin: callback
+      callable: ucfirst
+    - plugin: entity_generate
+      entity_type: taxonomy_term
+      value_key: name
+      bundle_key: vid
+      bundle: business_types
+
+  field_address/country_code:
+    plugin: default_value
+    default_value: "US"
+  field_address/address_line1: src_address1
+  field_address/address_line2: src_address2
+  field_address/locality: src_city
+  field_address/administrative_area: src_state
+  field_address/postal_code: src_postal_code
+  # Unused fields that may have to be declared here anyway:
+  field_address/langcode:
+    plugin: default_value
+    default_value: ""
+  field_address/dependent_locality:
+    plugin: default_value
+    default_value: null
+  field_address/sorting_code:
+    plugin: default_value
+    default_value: null
+  field_address/organization:
+    plugin: default_value
+    default_value: null
+  field_address/given_name:
+    plugin: default_value
+    default_value: null
+  field_address/additional_name:
+    plugin: default_value
+    default_value: null
+  field_address/family_name:
+    plugin: default_value
+    default_value: null
+
+  # geolocation works
+  field_geolocation/lat:
+    - plugin: skip_on_empty
+      source: src_lat
+      method: process
+      message: "No latitude listed. Skipping."
+  field_geolocation/lng:
+    - plugin: skip_on_empty
+      source: src_lon
+      method: process
+      message: "No longitude listed. Skipping."
+
+  #working now
+  field_geofield:
+    plugin: geofield_latlon
+    source:
+      - src_lat
+      - src_lon
+
+  field_business_description/value:
+    - plugin: skip_on_empty
+      source: src_business_description
+      method: process
+      message: "No About listed. Skipping"
+  field_business_description/format:
+    plugin: default_value
+    default_value: basic_html
+
+  field_business_hours:
+    plugin: csv_office_hours
+    slots_per_day: 2
+    delimiter: "-"
+    source:
+      - src_sun1
+      - src_sun2
+      - src_mon1
+      - src_mon2
+      - src_tue1
+      - src_tue2
+      - src_wed1
+      - src_wed2
+      - src_thu1
+      - src_thu2
+      - src_fri1
+      - src_fri2
+      - src_sat1
+      - src_sat2
+
+  # We're going to link all the offers created with the offer migration to the business locations (after the offers are migrated)
+  field_business_offers:
+    - plugin: skip_on_empty
+      source: src_business_offers
+      method: process
+      message: "No Offers listed. Skipping"
+    - plugin: explode
+      delimiter: ";"
+    - plugin: callback
+      callable: trim
+    - plugin: migration_lookup
+      migration: rooster_node_business_offers
+
+  urls_temp:
+    - plugin: skip_on_empty
+      source: src_links
+      method: process
+      message: "No links. Skipping."
+    - plugin: explode
+      delimiter: ";"
+    - plugin: explode
+      delimiter: "|"
+    - plugin: default_value
+      default_value: ""
+  field_business_links:
+    - plugin: skip_on_empty
+      method: process
+      source: "@urls_temp"
+      message: "No links. Skipping."
+    - plugin: sub_process
+      process:
+        title: "0"
+        uri: "1"
+
+  # Text String
+  field_business_parent_id:
+    plugin: skip_on_empty
+    source: source_parent_id
+    method: process
+    message: "No Parent ID. Skipping."
+
+  # Text String
+  field_business_place_id:
+    plugin: skip_on_empty
+    source: source_parent_id
+    method: process
+    message: "No Place ID. Skipping."
+
+  #Boolean 0/empty = Open, 1 = Temporarily Closed
+  field_business_temp_closed:
+    plugin: skip_on_empty
+    source: src_temp_closed
+    method: process
+    message: "No Temp Closed Status specified. Skipping."
+
+  field_business_phone:
+    plugin: skip_on_empty
+    source: src_business_phone
+    method: process
+    message: "No Phone Number. Skipping."
+
+destination:
+  plugin: "entity:node"
+  default_bundle: business_location
+migration_dependencies:
+  required:
+    - rooster_users
+    - rooster_file_bg_photo_to_media
+    - rooster_file_logo_to_media
+    - rooster_node_parent_business
+  optional:
+    - rooster_node_business_offers
